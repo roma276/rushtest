@@ -1,2 +1,3 @@
-# rushtest
-rush test case
+# Rush Тестовое задание
+
+## Цели
