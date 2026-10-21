@@ -1,0 +1,2 @@
+# rushtest
+rush test case
