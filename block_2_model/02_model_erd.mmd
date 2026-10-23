@@ -1,0 +1,85 @@
+erDiagram
+    core_po_header ||--o{ core_po_line_version : "order_id"
+    core_po_line_version }o--|| core_dim_item : "item_id (optional)"
+    core_dim_item }o--|| core_dim_uom : "uom_code (optional)"
+    core_po_header ||--o{ core_fact_receipt : "order_id"
+    core_supplier_version }o--o{ core_po_header : "supplier_id + date interval (temporal)"
+    core_dim_fx_rate }o--o{ core_po_header : "currency + rate_date (conversion rule TBD)"
+    core_po_header {
+        TEXT order_id PK
+        TEXT supplier_id
+        TEXT order_dttm_msk
+        TEXT currency
+        TEXT delivery_city
+        TEXT order_type
+    }
+    core_po_line_version {
+        INTEGER line_version_sk PK
+        INTEGER source_row_no UK
+        TEXT order_id FK
+        TEXT line_no
+        TEXT item_id FK
+        REAL qty
+        REAL price
+        REAL plan_price
+        TEXT uom_code
+        TEXT planned_delivery_date
+        TEXT status
+        TEXT updated_at
+    }
+    core_fact_receipt {
+        TEXT receipt_id PK
+        TEXT order_id
+        TEXT line_no
+        TEXT received_at_utc
+        REAL qty_received
+        TEXT quality_status
+        TEXT warehouse_code
+    }
+    core_supplier_version {
+        INTEGER supplier_version_sk PK
+        TEXT supplier_id
+        TEXT inn
+        TEXT supplier_name
+        TEXT region
+        TEXT reliability_class
+        TEXT valid_from
+        TEXT valid_to
+        INTEGER is_current
+    }
+    core_dim_item {
+        TEXT item_id PK
+        TEXT item_name
+        TEXT category
+        TEXT category_reported
+        TEXT uom_code
+    }
+    core_dim_uom {
+        TEXT uom_code PK
+        TEXT uom_name
+        TEXT base_uom
+        REAL factor_to_base
+    }
+    core_dim_fx_rate {
+        TEXT rate_date PK
+        TEXT currency PK
+        REAL rate_to_rub
+    }
+    mart_order_line_versions {
+        INTEGER line_version_sk PK
+        TEXT order_id
+        TEXT line_no
+        TEXT item_id
+        REAL ordered_qty
+        REAL unit_price
+        TEXT currency
+        TEXT version_resolution_status
+    }
+    mart_receipts_by_order_line {
+        TEXT order_id
+        TEXT line_no
+        INTEGER receipt_event_count
+        REAL qty_received_total
+        TEXT first_received_at_utc
+        TEXT last_received_at_utc
+    }
