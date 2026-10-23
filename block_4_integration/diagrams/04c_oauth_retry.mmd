@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    participant I as Интеграция
+    participant T as OAuth2
+    participant R as Rate limiter
+    participant A as SRM API
+    participant D as Job state
+    I->>T: Получить token (client_credentials)
+    T-->>I: access_token + expires_in (ожидаемое поле)
+    I->>R: Получить слот
+    R-->>I: Разрешение
+    I->>A: Исходный GET с bearer token
+    alt 2xx
+        A-->>I: Успешный ответ
+        I->>D: Сохранить результат и прогресс
+    else 401
+        A-->>I: 401 + описание ошибки (проектное требование)
+        I->>T: Получить новый token
+        T-->>I: Новый token
+        I->>R: Получить слот
+        R-->>I: Разрешение
+        I->>A: Ограниченный повтор исходного GET
+        alt Повтор успешен
+            A-->>I: 2xx
+            I->>D: Сохранить результат
+        else Повтор неуспешен
+            A-->>I: Ошибка
+            I->>D: Записать ошибку; сохранить checkpoint
+        end
+    else 429 / 5xx / timeout
+        A-->>I: Временная ошибка
+        I->>D: Зафиксировать попытку
+        Note over I: Backoff+jitter, Retry-After при наличии; ограниченное число попыток
+    end

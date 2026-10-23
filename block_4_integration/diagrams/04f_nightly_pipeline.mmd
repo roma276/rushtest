@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    participant O as Оркестратор
+    participant S as Источники: 1С/SRM/FX
+    participant K as Kafka consumer (непрерывно)
+    participant R as Raw + DQ
+    participant C as Core
+    participant M as Marts
+    participant U as Status/уведомления
+    K->>R: Непрерывно сохранять receipt events
+    O->>S: Ночной запуск по расписанию
+    S-->>R: Инкременты и справочники
+    R->>R: DQ checks + quarantine
+    alt Обязательные загрузки и DQ успешны
+        R->>C: Преобразовать/обновить core
+        C->>M: Пересчитать зависимые витрины
+        M->>U: Обновить last_success_at, status=OK
+    else Сбой источника или DQ
+        R->>U: Зафиксировать ошибку и статус PARTIAL/STALE
+        Note over O,M: Не публиковать зависимые витрины как полностью актуальные
+        O->>S: Повтор/возобновление с checkpoint
+        O->>U: Уведомить ответственных по согласованному каналу
+    end

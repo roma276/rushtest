@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    participant S as Сервис интеграции
+    participant DB as БД + Outbox
+    participant P as Outbox Publisher
+    participant K as Kafka main topic
+    participant Q as Kafka DLQ topic
+    participant C as Consumer
+    S->>DB: Одна DB-транзакция: изменить данные + INSERT outbox
+    DB-->>S: Commit
+    P->>DB: Забрать PENDING event
+    P->>K: Publish event_id + payload
+    alt Broker ack получен
+        K-->>P: Ack
+        P->>DB: status=PUBLISHED
+    else Временная ошибка / ack потерян
+        K-->>P: Ошибка или timeout
+        Note over P: Повтор с backoff; дубль возможен
+        P->>DB: Сохранить attempt/error
+    else Исчерпаны попытки
+        P->>Q: Publish исходное событие + error metadata
+        Q-->>P: Ack DLQ
+        P->>DB: status=DLQ
+    end
+    K-->>C: Доставка at-least-once
+    C->>C: Дедупликация по event_id
+    Note over S,Q: DLQ publish и смена статуса требуют reconciliation при сбое между операциями
+    opt Компенсация внешнего действия
+        S->>DB: Создать отдельную compensation operation
+        P->>K: Publish compensation event/command
+        Note over S,C: COMPENSATION_DONE только после подтверждения результата по контракту получателя
+    end

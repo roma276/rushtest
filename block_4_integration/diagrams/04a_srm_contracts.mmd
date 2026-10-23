@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    participant O as Оркестратор
+    participant I as SRM интеграция
+    participant T as OAuth2
+    participant R as Rate limiter
+    participant A as SRM API
+    participant D as Raw DB + checkpoint
+    O->>I: Запуск incremental contracts(updatedFrom)
+    I->>D: Прочитать checkpoint
+    I->>T: Проверить срок токена / получить токен
+    loop Пока есть страницы/изменения
+        I->>R: Запросить слот
+        R-->>I: Разрешение по общему лимиту
+        I->>A: GET /contracts?page&size<=100&updatedFrom
+        A-->>I: Данные + X-Total-Count
+        I->>D: Upsert страницы и сохранить прогресс
+        D-->>I: Commit подтверждён
+    end
+    I->>D: Продвинуть checkpoint после успешного сохранения
+    I-->>O: Успех / частичный успех с ошибками

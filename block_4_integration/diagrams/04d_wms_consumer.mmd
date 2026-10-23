@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant W as WMS (чёрный ящик)
+    participant K as Kafka wms.receipts.v1
+    participant C as Consumer / adapter
+    participant D as Raw + dedup DB
+    participant M as Core / mart pipeline
+    W->>K: Публикация as-is receipt event
+    K-->>C: Сообщение + topic/partition/offset
+    C->>C: Проверить поля и типы
+    alt Некорректное сообщение
+        C->>D: Сохранить raw + quarantine reason
+        C-->>K: Подтвердить обработку после durable save
+    else Валидное сообщение
+        C->>D: Транзакция: dedup event_id + сохранить raw/canonical
+        alt event_id уже обработан
+            D-->>C: Duplicate
+            C-->>K: Подтвердить после проверки дедупликации
+        else Новое событие
+            D-->>C: Commit
+            C-->>K: Подтвердить offset после commit
+            C->>M: Данные доступны для преобразования/пересчёта
+        end
+    end
+    Note over C,D: ts не гарантирует порядок; sequence_number запрашивается в целевом контракте

@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    participant O as Оркестратор
+    participant I as SRM интеграция
+    participant R as Rate limiter
+    participant A as SRM API
+    participant D as Raw DB + job state
+    O->>I: Запуск/возобновление tenders
+    I->>D: Прочитать последнюю сохранённую страницу
+    loop Страница не пустая
+        I->>R: Запросить слот
+        R-->>I: Разрешение
+        I->>A: GET /tenders?page&size=100
+        A-->>I: Страница
+        alt Ответ содержит записи
+            I->>D: Upsert по tender ID + commit page checkpoint
+            I->>D: Создать/обновить lot job на каждый tender ID
+        else Пустой ответ (допущение)
+            I->>D: Отметить обход завершённым
+        end
+    end
+    loop Каждое lot job
+        I->>R: Запросить слот
+        R-->>I: Разрешение
+        I->>A: GET /tenders/{id}/lots
+        alt Успешный ответ
+            A-->>I: Лоты
+            I->>D: Upsert лоты + job=SUCCESS
+        else Ошибка после повторов
+            A-->>I: Ошибка
+            I->>D: job=FAILED, причина и попытки
+        end
+    end
+    Note over I,D: При падении возобновить с checkpoint; нестабильная сортировка не гарантирует полноту
